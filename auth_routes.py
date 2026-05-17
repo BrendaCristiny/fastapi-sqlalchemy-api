@@ -2,16 +2,46 @@ from fastapi import APIRouter, Depends, HTTPException
 from models import user
 from dependencies import initiate_session
 #vou pegar meu bcrypt do main pra usar aqui
-from main import bcrypt_context
+from main import bcrypt_context, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from schemas import users_schemes, LoginSchemas
 from sqlalchemy.orm import Session
+from jose import jwt, JWTError
+from datetime import datetime, timedelta, timezone
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
+def create_token(user_id, token_duration=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
 
-def create_token(user_id):
-    token = f"iahfuoi289739q{user_id}"
-    return token
+    expiration_date = (
+        datetime.now(timezone.utc)
+        + token_duration
+    )
+
+    information_dic = {
+        "sub": str(user_id),
+        "exp": expiration_date
+    }
+
+    encoded_jwt = jwt.encode(
+        information_dic,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+    return encoded_jwt
+
+def verify_token(token, session: Session = Depends(initiate_session)):
+    #extrair o id do usuario do token
+    db_user =  session.query(user).filter(user.id==1).first()
+    return db_user
+
+def authenticate_user(email,password, session):
+    db_user = session.query(user).filter(user.email==email).first()
+    if not db_user:
+        return False
+    elif not bcrypt_context.verify(password, db_user.password):
+        return False
+    return db_user 
 
 
 @auth_router.get("/")
@@ -43,14 +73,24 @@ async def create_account(UsersSchemes:users_schemes, session:Session=Depends(ini
 
 @auth_router.post("/login")
 async def login(login_schema: LoginSchemas, session: Session = Depends (initiate_session)):
-    db_user = session.query(user).filter(user.email==login_schema.email).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Usuário não encontrado. Tente novamente!")
+    db_user = authenticate_user(login_schema.email, login_schema.password, session)
+    if not db_user:
+        raise HTTPException(status_code=400, detail="Usuário não encontrado, ou credenciais inválidas. Tente novamente!")
     else:
-        access_token = create_token(user.id)
+        access_token = create_token(db_user.id)
+        refresh_token = create_token(db_user.id, token_duration=timedelta(days=7))
         return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "Bearer"
+        }
+        
+@auth_router.get("/refresh")
+async def use_refresh_token(token):
+    #verificar o token
+    user = verify_token(token)
+    access_token = create_token(user.id)
+    return {
             "access_token": access_token,
             "token_type": "Bearer"
         }
-        #JWT Bearer
-        headers = {"Access-Token" : "Bearer token"}
