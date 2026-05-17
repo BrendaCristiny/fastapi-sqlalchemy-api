@@ -1,0 +1,23 @@
+from fastapi import FastAPI
+#para criptografar as senhas:
+from passlib.context import CryptContext
+#pra carregar as variaveis de ambiente dentro do meu arquivo .env
+from dotenv import load_dotenv
+#Ler variáveis do .env
+import os
+
+load_dotenv()
+SECRET_KEY=os.getenv("SECRET_KEY")
+
+bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+#instância da classe:
+app = FastAPI()
+
+#como eu criei arquivos individuais para organizar as rotas, vou importá-los:
+from auth_routes import auth_router
+from order_routes import order_router
+
+#vou pedir para meu arquivo atual incluir minhas rotas aqui:
+app.include_router(auth_router)
+app.include_router(order_router)
