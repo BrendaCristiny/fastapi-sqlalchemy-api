@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models import user
-from dependencies import initiate_session
+from dependencies import initiate_session, verify_token
 #vou pegar meu bcrypt do main pra usar aqui
 from main import bcrypt_context, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from schemas import users_schemes, LoginSchemas
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
+from fastapi.security import OAuth2PasswordRequestForm
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,10 +31,7 @@ def create_token(user_id, token_duration=timedelta(minutes=ACCESS_TOKEN_EXPIRE_M
 
     return encoded_jwt
 
-def verify_token(token, session: Session = Depends(initiate_session)):
-    #extrair o id do usuario do token
-    db_user =  session.query(user).filter(user.id==1).first()
-    return db_user
+
 
 def authenticate_user(email,password, session):
     db_user = session.query(user).filter(user.email==email).first()
@@ -84,12 +82,25 @@ async def login(login_schema: LoginSchemas, session: Session = Depends (initiate
             "refresh_token": refresh_token,
             "token_type": "Bearer"
         }
+    
+#criar um novo end point de login para o botão "authorize" no canto superior direito funcionar
+@auth_router.post("/login-form")
+async def login_form(form_data: OAuth2PasswordRequestForm = Depends (), session: Session = Depends (initiate_session)):
+    db_user = authenticate_user(form_data.username, form_data.password, session)
+    if not db_user:
+        raise HTTPException(status_code=400, detail="Usuário não encontrado, ou credenciais inválidas. Tente novamente!")
+    else:
+        access_token = create_token(db_user.id)
+        refresh_token = create_token(db_user.id, token_duration=timedelta(days=7))
+        return {
+            "access_token": access_token,
+            "token_type": "Bearer"
+        }
         
 @auth_router.get("/refresh")
-async def use_refresh_token(token):
+async def use_refresh_token(db_user: user =  Depends (verify_token)):
     #verificar o token
-    user = verify_token(token)
-    access_token = create_token(user.id)
+    access_token = create_token(db_user.id)
     return {
             "access_token": access_token,
             "token_type": "Bearer"
