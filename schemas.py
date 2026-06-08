@@ -26,3 +26,13 @@ class LoginSchemas(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ItemOrderSchema(BaseModel):
+    amount : int
+    flavor : str
+    size : str
+    unit_price : float
+    '''order_id = int'''#n está aqui porque está já sendo exigido em nossa rota
+
+    class Config:
+        from_attributes = True

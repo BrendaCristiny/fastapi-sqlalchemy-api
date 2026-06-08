@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, ForeignKey
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy_utils.types import ChoiceType
 
 #cria a conexão do banco
@@ -45,6 +45,8 @@ class order(Base):
     status = Column ("status", String) #pendente, cancelado, finalizado
     user = Column(Integer, ForeignKey("users.id"))#o id da outra tabela, para ambos mostrarem o meu usuario
     price = Column ("price", Float)
+    #Vou conectar ambas as tabelas sem necessariamente criar uma dependencia
+    items = relationship("item_ordered", cascade="all, delete") #cascade = quando eu deletar um pedido especifico ele vai cascadear/sincronizar esse processo para todos relacionados
 
     def __init__(self, user, status="pending", price=0):
         self.user = user
@@ -52,6 +54,11 @@ class order(Base):
         #preciso definir que só é possível 3 opções (pendente, cancelado, finalizado)
         self.status = status
 
+    def calculate_price(self):
+        self.price = sum(
+            item.unit_price * item.amount
+            for item in self.items
+        )
 
 #ITENS PEDIDO
 class item_ordered(Base):
