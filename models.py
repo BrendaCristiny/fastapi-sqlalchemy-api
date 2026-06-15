@@ -38,7 +38,7 @@ class order(Base):
     #order_status= (
      #   ("pending", "pending"),
       #  ("cancelled", "cancelled"),
-       # ("Finished", "Finished")
+       # ("Finished", "finished")
     #)
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)

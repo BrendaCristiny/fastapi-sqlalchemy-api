@@ -14,7 +14,7 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")) #int pq é número (a expiração)
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_schema = OAuth2PasswordBearer(tokenUrl="auth/login-form")
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/login-form")
 
 #instância da classe:
 app = FastAPI()

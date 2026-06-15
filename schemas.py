@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 #para que alguns parâmtros possam ser opcionais
-from typing import Optional
+from typing import Optional, List
 
 class users_schemes(BaseModel):
     name: str
@@ -33,6 +33,16 @@ class ItemOrderSchema(BaseModel):
     size : str
     unit_price : float
     '''order_id = int'''#n está aqui porque está já sendo exigido em nossa rota
+
+    class Config:
+        from_attributes = True
+    
+#informações que '1' pedido contém 
+class ResponseOrderSchema(BaseModel):
+    id: int
+    status: str
+    price: float
+    items: List[ItemOrderSchema]
 
     class Config:
         from_attributes = True

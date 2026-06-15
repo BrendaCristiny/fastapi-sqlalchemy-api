@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from dependencies import initiate_session, verify_token
-from schemas import OrderSchema, ItemOrderSchema
+from schemas import OrderSchema, ItemOrderSchema, ResponseOrderSchema
 from models import order, user, item_ordered
+from typing import List
 
 #Qualquer dependencia aqui, irá aplicar para todas 
 order_router = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(verify_token)])
@@ -22,29 +23,28 @@ async def create_order(order_schema: OrderSchema, session: Session = Depends (in
     session.commit()
     return {"Mensagem": f"Pedido criado com sucesso! ID do pedido:{new_order.id}"}
 
-# colchetes para passar na rota como parâmetro
 @order_router.post("/order/cancel/{order_id}")
 async def cancel_order(order_id: int, session: Session = Depends(initiate_session), db_user: user = Depends(verify_token)):
-    order = session.query(order).filter(order.id == order_id).first()
+    Order = session.query(order).filter(order.id == order_id).first()
 
-    if not order:
+    if not Order:
         raise HTTPException(
             status_code=400,
             detail="Pedido não encontrado, ou não existente."
         )
 
     # Se não for admin E não for dono do pedido
-    if not db_user.admin and db_user.id != order.user:
+    if not db_user.admin and db_user.id != Order.user:
         raise HTTPException(
             status_code=401,
             detail="Você não tem permissão para performar essa ação."
         )
-    order.status = "cancelled"
+    Order.status = "cancelled"
     session.commit()  # salvar alterações
 
     return {
-        "mensagem": f"Pedido número:{order.id} cancelado com sucesso!",
-        "pedido": order
+        "mensagem": f"Pedido número:{Order.id} cancelado com sucesso!",
+        "pedido": Order
     }
 
 @order_router.get("/list")
@@ -77,3 +77,71 @@ async def add_order(order_id: int, item_order_schema : ItemOrderSchema, session:
         "item_id" : Item_Ordered.id,
         "Preco_pedido": Order.price
     }
+
+@order_router.post("/order/remove-item/{order_item_id}")
+async def remove_item_order(order_item_id: int, session: Session = Depends(initiate_session), db_user: user = Depends(verify_token)):
+    Item_Ordered = session.query(item_ordered).filter(item_ordered.id == order_item_id).first()
+    Order = session.query(order).filter(order.id == Item_Ordered.order).first()
+    if not Item_Ordered:
+        raise HTTPException(status_code=400, detail="Item não existente")
+    if not db_user.admin and db_user.id != Order.user:
+        raise HTTPException(status_code=401, detail="Você não tem permissão para fazer essa operação.")
+    session.delete(Item_Ordered)
+    session.commit()
+    Order.calculate_price()
+    session.commit()
+    return {
+        "mensagem" : "Item removido com sucesso",
+        "quantidade_itens_pedido": len(Order.items),
+        "pedido" : Order
+    }
+
+#finalizar um pedido
+@order_router.post("/order/finalize/{order_id}")
+async def finalize_order(order_id: int, session: Session = Depends(initiate_session), db_user: user = Depends(verify_token)):
+    Order = session.query(order).filter(order.id == order_id).first()
+
+    if not Order:
+        raise HTTPException(
+            status_code=400,
+            detail="Pedido não encontrado, ou não existente."
+        )
+
+    # Se não for admin E não for dono do pedido
+    if not db_user.admin and db_user.id != Order.user:
+        raise HTTPException(
+            status_code=401,
+            detail="Você não tem permissão para performar essa ação."
+        )
+    Order.status = "finished"
+    session.commit()  # salvar alterações
+
+    return {
+        "mensagem": f"Pedido número:{Order.id} finalizado com sucesso!",
+        "pedido": Order
+    }
+
+#visualizar 1 pedido
+@order_router.get("/order/{order_id}")
+async def visualize_order(order_id:int, session: Session = Depends(initiate_session), db_user: user = Depends(verify_token)):
+    Order = session.query(order).filter(order.id == order_id).first()
+    if not Order:
+            raise HTTPException(
+                status_code=400,
+                detail="Pedido não encontrado, ou não existente.")
+
+        # Se não for admin E não for dono do pedido
+    if not db_user.admin and db_user.id != Order.user:
+        raise HTTPException(
+            status_code=401,
+            detail="Você não tem permissão para performar essa ação.")
+    return {
+        "quantidade_itens_pedido": len(Order.items),
+        "pedido" : Order
+    }
+
+#visualizar todos os pedidos de um usuário
+@order_router.get("/list/user-orders", response_model= List[ResponseOrderSchema])
+async def list_orders(session: Session = Depends(initiate_session), db_user: user = Depends(verify_token)):
+    orders = session.query(order).filter(order.user==db_user.id).all()
+    return orders

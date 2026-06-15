@@ -24,7 +24,7 @@ def verify_token(token: str = Depends(oauth2_schema), session: Session = Depends
         user_id = int(information_dic.get("sub")) #int pq é um ID
     except JWTError:
         #usuario não tem autorização
-        raise HTTPException (status_code= 401, detail= "Acesso negado. Verifique a validade do Toke e tente novamente!")
+        raise HTTPException (status_code= 401, detail= "Acesso negado. Verifique a validade do Token e tente novamente!")
     #extrair o id do usuario do token
     db_user =  session.query(user).filter(user.id==user_id).first()
     if not db_user:
